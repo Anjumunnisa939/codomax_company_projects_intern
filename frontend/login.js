@@ -30,7 +30,9 @@ loginForm.addEventListener("submit", async (event) => {
 
             localStorage.setItem("steppiToken", data.token);
             localStorage.setItem("steppiUser", JSON.stringify(data.user));
-            window.location.href = "/home";
+            window.location.href = data.user.isAdmin
+                ? "/admin-dashboard.html"
+                : "/dashboard.html";
 
         } else {
 

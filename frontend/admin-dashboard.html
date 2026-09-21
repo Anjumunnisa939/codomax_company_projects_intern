@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steppi - Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+    <header class="header">
+        <a href="home.html" class="logo">
+            <img src="images/logo.png" alt="Steppi Logo">
+        </a>
+        <nav class="nav">
+            <ul>
+                <li><a href="home.html">Home</a></li>
+                <li><a href="dashboard.html">My Dashboard</a></li>
+                <li><button id="adminLogout" class="admin-logout" type="button">Logout</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="admin-content">
+        <section class="admin-hero">
+            <p class="dashboard-label">Steppi control center</p>
+            <h1>Admin Dashboard</h1>
+            <p id="adminIdentity">Checking administrator access...</p>
+        </section>
+
+        <section class="admin-stats">
+            <div class="admin-stat"><strong id="userCount">0</strong><span>Total users</span></div>
+            <div class="admin-stat"><strong id="adminCount">0</strong><span>Administrators</span></div>
+            <div class="admin-stat"><strong id="memberCount">0</strong><span>Members</span></div>
+        </section>
+
+        <section class="admin-panel">
+            <div class="admin-heading">
+                <div>
+                    <p class="dashboard-label">Account directory</p>
+                    <h2>Manage Users</h2>
+                </div>
+                <button id="refreshUsers" type="button">Refresh</button>
+            </div>
+            <p id="adminMessage" role="status"></p>
+            <div id="userList" class="admin-user-list"></div>
+        </section>
+    </main>
+
+    <script src="admin-dashboard.js"></script>
+</body>
+</html>

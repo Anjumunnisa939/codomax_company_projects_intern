@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -14,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const DATA_FILE = path.join(__dirname, "data.json");
 const TOKEN_SECRET =
-    process.env.TOKEN_SECRET || "change-this-secret-before-production";
+    process.env.TOKEN_SECRET;
 
 app.use(cors());
 app.use(express.json());
@@ -83,26 +84,21 @@ function passwordMatches(password, stored) {
 ========================= */
 
 function createToken(user) {
-    const payload = Buffer.from(
-        JSON.stringify({
+    return jwt.sign(
+        {
             id: user.id,
             email: user.email
-        })
-    ).toString("base64url");
-
-    const signature = crypto
-        .createHmac("sha256", TOKEN_SECRET)
-        .update(payload)
-        .digest("base64url");
-
-    return `${payload}.${signature}`;
+        },
+        TOKEN_SECRET,
+        { expiresIn: "1d" }
+    );
 }
 
 /* =========================
    AUTH MIDDLEWARE
 ========================= */
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
     const token = req.headers.authorization?.replace(
         /^Bearer\s+/i,
         ""
@@ -115,48 +111,43 @@ function requireAuth(req, res, next) {
         });
     }
 
-    const [payload, signature] = token.split(".");
-
-    if (!payload || !signature) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid authentication token."
-        });
-    }
-
-    const expected = crypto
-        .createHmac("sha256", TOKEN_SECRET)
-        .update(payload)
-        .digest("base64url");
-
-    const signatureBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expected);
-
-    if (
-        signatureBuffer.length !== expectedBuffer.length ||
-        !crypto.timingSafeEqual(
-            signatureBuffer,
-            expectedBuffer
-        )
-    ) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid authentication token."
-        });
-    }
-
     try {
-        req.user = JSON.parse(
-            Buffer.from(payload, "base64url").toString("utf8")
-        );
+        const decoded = jwt.verify(token, TOKEN_SECRET);
+        const user = await User.findOne({ id: decoded.id });
 
-        next();
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User account no longer exists."
+            });
+        }
+
+        req.user = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role || "user",
+            isAdmin: user.role === "admin" || user.email === process.env.ADMIN_EMAIL
+        };
+
+        return next();
     } catch {
         return res.status(401).json({
             success: false,
-            message: "Invalid authentication token."
+            message: "Invalid or expired authentication token."
         });
     }
+}
+
+function requireAdmin(req, res, next) {
+    if (!req.user?.isAdmin) {
+        return res.status(403).json({
+            success: false,
+            message: "Administrator access is required."
+        });
+    }
+
+    return next();
 }
 
 /* =========================
@@ -266,10 +257,10 @@ app.post(["/api/auth/register", "/api/users/register"], async (req, res) => {
 });
 
 /* =========================
-   LOGIN
+    LOGIN
 ========================= */
 
-app.post("/api/users/login", (req, res) => {
+app.post(["/api/auth/login", "/api/users/login"], async (req, res) => {
     const email = req.body.email?.trim().toLowerCase();
     const { password } = req.body;
 
@@ -280,31 +271,52 @@ app.post("/api/users/login", (req, res) => {
         });
     }
 
-    const data = readData();
+    try {
+        const user = await User.findOne({ email });
 
-    const user = data.users.find(
-        (item) => item.email === email
-    );
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password."
+            });
+        }
 
-    if (
-        !user ||
-        !passwordMatches(password, user.password)
-    ) {
-        return res.status(401).json({
+        return res.json({
+            success: true,
+            message: "Login successful.",
+            token: createToken(user),
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role || "user",
+                isAdmin: user.role === "admin" || user.email === process.env.ADMIN_EMAIL
+            }
+        });
+    } catch (error) {
+        console.error("Login failed:", error.message);
+        return res.status(500).json({
             success: false,
-            message: "Invalid email or password."
+            message: "Unable to log in at this time."
         });
     }
+});
 
+/* =========================
+   PROFILE AND LOGOUT
+========================= */
+
+app.get("/api/auth/profile", requireAuth, (req, res) => {
     res.json({
         success: true,
-        message: "Login successful.",
-        token: createToken(user),
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email
-        }
+        user: req.user
+    });
+});
+
+app.post("/api/auth/logout", requireAuth, (req, res) => {
+    res.json({
+        success: true,
+        message: "Logged out successfully. Remove the token from the client."
     });
 });
 
@@ -355,6 +367,118 @@ app.get("/api/blogs", (req, res) => {
         success: true,
         blogs: data.blogs
     });
+});
+
+app.get("/api/blogs/my", requireAuth, (req, res) => {
+    const data = readData();
+    const blogs = data.blogs.filter((blog) => blog.authorId === req.user.id);
+
+    res.json({
+        success: true,
+        blogs
+    });
+});
+
+/* =========================
+   ADMIN USER MANAGEMENT
+========================= */
+
+app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const users = (await User.find().select("-password").sort({ createdAt: -1 }))
+            .map((user) => ({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role || "user",
+                isAdmin: user.role === "admin" || user.email === process.env.ADMIN_EMAIL,
+                createdAt: user.createdAt
+            }));
+
+        return res.json({
+            success: true,
+            count: users.length,
+            users
+        });
+    } catch (error) {
+        console.error("Admin user lookup failed:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Unable to load users."
+        });
+    }
+});
+
+app.put("/api/admin/users/:id/password", requireAuth, requireAdmin, async (req, res) => {
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+        return res.status(400).json({
+            success: false,
+            message: "Password must contain at least 6 characters."
+        });
+    }
+
+    try {
+        const user = await User.findOneAndUpdate(
+            { id: req.params.id },
+            { password: await bcrypt.hash(password, 10) },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "User password updated successfully."
+        });
+    } catch (error) {
+        console.error("Admin password update failed:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Unable to update the password."
+        });
+    }
+});
+
+app.delete("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+    if (req.params.id === req.user.id) {
+        return res.status(400).json({
+            success: false,
+            message: "You cannot delete your own administrator account."
+        });
+    }
+
+    try {
+        const user = await User.findOneAndDelete({ id: req.params.id });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        const data = readData();
+        data.blogs = data.blogs.filter((blog) => blog.authorId !== req.params.id);
+        writeData(data);
+
+        return res.json({
+            success: true,
+            message: "User deleted successfully."
+        });
+    } catch (error) {
+        console.error("Admin user deletion failed:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Unable to delete the user."
+        });
+    }
 });
 
 /* =========================

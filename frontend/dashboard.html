@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steppi - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-page">
+    <header class="header">
+        <a href="home.html" class="logo">
+            <img src="images/logo.png" alt="Steppi Logo">
+        </a>
+        <nav class="nav">
+            <ul>
+                <li><a href="home.html">Home</a></li>
+                <li><a href="blog.html">Write Blog</a></li>
+                <li><button id="logoutButton" type="button">Logout</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="dashboard-content">
+        <section class="dashboard-panel">
+            <p class="dashboard-label">Your account</p>
+            <h1 id="welcomeMessage">Loading dashboard...</h1>
+            <div id="profileDetails"></div>
+        </section>
+
+        <section class="dashboard-panel">
+            <div class="dashboard-heading">
+                <h2>My Blogs</h2>
+                <a class="dashboard-button" href="blog.html">Create Blog</a>
+            </div>
+            <div id="myBlogs"></div>
+        </section>
+
+        <section id="adminPanel" class="dashboard-panel" hidden>
+            <div class="dashboard-heading">
+                <h2>Admin Users</h2>
+                <strong id="userCount">0 users</strong>
+            </div>
+            <p id="adminMessage"></p>
+            <div id="userList"></div>
+        </section>
+    </main>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
