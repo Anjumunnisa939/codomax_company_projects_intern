@@ -404,6 +404,69 @@ body{
 }
 
 
+/* Brand management form */
+.brand-manager {
+    width: 90%;
+    margin: 30px auto;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-sizing: border-box;
+}
+
+.brand-manager h1 {
+    margin: 0 0 20px;
+    text-align: center;
+}
+
+#brandForm {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+#brandForm input,
+#brandForm select {
+    flex: 1 1 180px;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+#brandForm button,
+.brand-actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: white;
+    background: #222;
+    cursor: pointer;
+}
+
+#brandForm button:hover,
+.brand-actions button:hover {
+    background: #ff9800;
+}
+
+.brand-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.brand-actions .delete-brand {
+    background: #c62828;
+}
+
+.brand-actions .delete-brand:hover {
+    background: #8e0000;
+}
+
+
 
 /* Brands Section */
 .brands {

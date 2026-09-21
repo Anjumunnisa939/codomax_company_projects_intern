@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -6,6 +7,7 @@ const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+const User = require("./models/user");
 
 const app = express();
 
@@ -194,7 +196,7 @@ app.get("/api/health", (req, res) => {
    REGISTER
 ========================= */
 
-app.post("/api/users/register", (req, res) => {
+app.post(["/api/auth/register", "/api/users/register"], async (req, res) => {
     const name = req.body.name?.trim();
     const email = req.body.email?.trim().toLowerCase();
     const { password } = req.body;
@@ -220,39 +222,47 @@ app.post("/api/users/register", (req, res) => {
         });
     }
 
-    const data = readData();
+    try {
+        const existingUser = await User.findOne({ email });
 
-    if (
-        data.users.some(
-            (user) => user.email === email
-        )
-    ) {
-        return res.status(409).json({
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "An account with this email already exists."
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await User.create({
+            name,
+            email,
+            password: hashedPassword
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: "Registration successful. Please log in.",
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "An account with this email already exists."
+            });
+        }
+
+        console.error("Registration failed:", error.message);
+        return res.status(500).json({
             success: false,
-            message: "An account with this email already exists."
+            message: "Unable to register at this time."
         });
     }
-
-    const user = {
-        id: crypto.randomUUID(),
-        name,
-        email,
-        password: hashPassword(password),
-        createdAt: new Date().toISOString()
-    };
-
-    data.users.push(user);
-    writeData(data);
-
-    res.status(201).json({
-        success: true,
-        message: "Registration successful. Please log in.",
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email
-        }
-    });
 });
 
 /* =========================

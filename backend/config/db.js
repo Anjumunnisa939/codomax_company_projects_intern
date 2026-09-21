@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const dns = require("dns");
+const dns = require("dns");//it should be
 
 dns.setServers(["8.8.8.8"]);
 
